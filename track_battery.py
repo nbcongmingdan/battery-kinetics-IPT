@@ -3,9 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 from tqdm import tqdm
+from pathlib import Path
 
 VIDEO_PATH = "/home/xuwentao/IPT-2026/test-videos/cut-05.mov"
-PIXEL_TO_METER = 0.001
+PIXEL_TO_METER = 0.000364
 FPS_OVERRIDE = None
 
 SHOW_DEBUG = True          # 👈 是否显示检测框
@@ -15,7 +16,8 @@ SAVE_DEBUG_VIDEO = True   # 👈 是否保存带框视频
 # 1. 打开视频
 # --------------------------------------
 
-cap = cv2.VideoCapture(VIDEO_PATH)
+video_path = Path(VIDEO_PATH)
+cap = cv2.VideoCapture(str(video_path))
 
 if not cap.isOpened():
     raise RuntimeError("Cannot open video")
@@ -30,8 +32,11 @@ width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 if SAVE_DEBUG_VIDEO:
+    debug_dir = Path("debug_output")
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    debug_output_path = debug_dir / f"{video_path.stem}-debug.mp4"
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter("debug_output.mp4", fourcc, fps, (width, height))
+    out = cv2.VideoWriter(str(debug_output_path), fourcc, fps, (width, height))
 
 # --------------------------------------
 # 2. 背景模型
