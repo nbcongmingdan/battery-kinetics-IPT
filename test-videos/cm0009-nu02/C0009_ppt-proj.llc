@@ -1,0 +1,84 @@
+{
+  version: 2,
+  mediaFileName: 'C0009_ppt.MP4',
+  cutSegments: [
+    {
+      start: 2.26546875,
+      end: 3.5240625,
+      name: '',
+      selected: true,
+    },
+    {
+      start: 5.495859375,
+      end: 7.048125,
+      name: '',
+      selected: true,
+    },
+    {
+      start: 9.691171875,
+      end: 10.65609375,
+      name: '',
+      selected: true,
+    },
+    {
+      start: 12.418125,
+      end: 13.34109375,
+      name: '',
+      selected: true,
+    },
+    {
+      start: 40.316953125,
+      end: 41.239921875,
+      name: '',
+      selected: true,
+    },
+    {
+      start: 51.60234375,
+      end: 52.609218750000004,
+      name: '',
+      selected: true,
+    },
+    {
+      start: 64.98539062500001,
+      end: 66.076171875,
+      name: '',
+      selected: true,
+    },
+    {
+      start: 68.257734375,
+      end: 69.13875,
+      name: '',
+      selected: true,
+    },
+    {
+      start: 70.90078125,
+      end: 71.865703125,
+      name: '',
+      selected: true,
+    },
+    {
+      start: 74.04726562500001,
+      end: 74.92828125,
+      name: '',
+      selected: true,
+    },
+    {
+      start: 76.94203125,
+      end: 77.94890625000001,
+      name: '',
+      selected: true,
+    },
+    {
+      start: 80.004609375,
+      end: 81.011484375,
+      name: '',
+      selected: true,
+    },
+    {
+      start: 82.941328125,
+      end: 84.0740625,
+      name: '',
+      selected: true,
+    },
+  ],
+}

@@ -5,7 +5,7 @@ from scipy.signal import savgol_filter
 from tqdm import tqdm
 from pathlib import Path
 
-VIDEO_PATH = "/home/xuwentao/IPT-2026/test-videos/cut-05.mov"
+VIDEO_PATH = "/home/xuwentao/IPT-2026/test-videos/cm0008-nu01/C0008_ppt-00.00.26.190-00.00.27.158-seg08.MP4"
 PIXEL_TO_METER = 0.000364
 FPS_OVERRIDE = None
 

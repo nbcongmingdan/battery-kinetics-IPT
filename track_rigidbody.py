@@ -5,9 +5,20 @@ from scipy.signal import savgol_filter
 from tqdm import tqdm
 from pathlib import Path
 
-VIDEO_PATH = "/home/xuwentao/IPT-2026/test-videos/cut-05.mov"
-PIXEL_TO_METER = 0.001
+VIDEO_PATH = "/home/xuwentao/IPT-2026/test-videos/nu.00/C0007.MP4_ppt-00.00.01.569-00.00.03.187-seg01.mp4"
+PIXEL_TO_METER = 0.000364
 FPS_OVERRIDE = None
+
+# Uniform solid cylinder parameters
+MASS_KG = 0.011
+LENGTH_M = 0.044
+DIAMETER_M = 0.0102
+RADIUS_M = DIAMETER_M / 2.0
+
+# Rotation is in-plane (y-z), so omega is about x-axis (out of plane).
+# Use moment of inertia about an axis through center, perpendicular to cylinder axis.
+INERTIA_KG_M2 = (1.0 / 12.0) * MASS_KG * (3.0 * RADIUS_M**2 + LENGTH_M**2)
+GRAVITY_M_S2 = 9.80665
 
 SHOW_DEBUG = True
 WRITE_DEBUG_VIDEO = True
@@ -46,6 +57,7 @@ fgbg = cv2.createBackgroundSubtractorMOG2(
 
 centers = []
 angles = []
+areas = []
 
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
@@ -72,17 +84,20 @@ for _ in tqdm(range(total_frames)):
     )
 
     cx, cy, theta = np.nan, np.nan, np.nan
+    area = np.nan
 
     if contours:
         c = max(contours, key=cv2.contourArea)
 
-        if cv2.contourArea(c) > 200 and len(c) >= 5:
+        contour_area = cv2.contourArea(c)
+        if contour_area > 200 and len(c) >= 5:
 
             ellipse = cv2.fitEllipse(c)
 
             (cx, cy), (MA, ma), angle = ellipse
 
             theta = np.deg2rad(angle)
+            area = contour_area
 
             if SHOW_DEBUG:
                 cv2.ellipse(frame, ellipse, (0,255,0), 2)
@@ -90,6 +105,7 @@ for _ in tqdm(range(total_frames)):
 
     centers.append((cx, cy))
     angles.append(theta)
+    areas.append(area)
 
     if SHOW_DEBUG:
         cv2.imshow("Rigid Body Tracking", frame)
@@ -105,6 +121,7 @@ cv2.destroyAllWindows()
 
 centers = np.array(centers)
 angles = np.array(angles)
+areas = np.array(areas)
 
 # --------------------------------------
 # 3. 转物理单位
@@ -121,6 +138,7 @@ x = x[valid]
 y = y[valid]
 theta = theta[valid]
 time = time[valid]
+area = areas[valid]
 
 # --------------------------------------
 # 4. 角度展开（避免跳变）
@@ -137,17 +155,49 @@ window = 21 if len(x) > 21 else len(x)//2*2+1
 x_s = savgol_filter(x, window, 3)
 y_s = savgol_filter(y, window, 3)
 theta_s = savgol_filter(theta, window, 3)
+area_s = savgol_filter(area, window, 3)
 
-vx = np.gradient(x_s, dt)
-vy = np.gradient(y_s, dt)
-omega = np.gradient(theta_s, dt)
+vx = savgol_filter(x, window, 3, deriv=1, delta=dt)
+vy = savgol_filter(y, window, 3, deriv=1, delta=dt)
+omega = savgol_filter(theta, window, 3, deriv=1, delta=dt)
 
-ax = np.gradient(vx, dt)
-ay = np.gradient(vy, dt)
-alpha = np.gradient(omega, dt)
+ax = savgol_filter(x, window, 3, deriv=2, delta=dt)
+ay = savgol_filter(y, window, 3, deriv=2, delta=dt)
+alpha = savgol_filter(theta, window, 3, deriv=2, delta=dt)
 
 # --------------------------------------
-# 6. 保存
+# 6. 计算绕 y 轴角度（由 yz 投影面积）
+# --------------------------------------
+
+area_m2 = area_s * (PIXEL_TO_METER ** 2)
+
+proj_a = 2.0 * RADIUS_M * LENGTH_M
+proj_b = np.pi * RADIUS_M ** 2
+proj_r = np.sqrt(proj_a ** 2 + proj_b ** 2)
+proj_delta = np.arctan2(proj_b, proj_a)
+
+arg = np.clip(area_m2 / proj_r, -1.0, 1.0)
+acos_val = np.arccos(arg)
+phi1 = proj_delta + acos_val
+phi2 = proj_delta - acos_val
+phi = np.where((phi1 >= 0.0) & (phi1 <= np.pi / 2.0), phi1, phi2)
+phi = np.clip(phi, 0.0, np.pi / 2.0)
+
+omega_y = savgol_filter(phi, window, 3, deriv=1, delta=dt)
+alpha_y = savgol_filter(phi, window, 3, deriv=2, delta=dt)
+
+# --------------------------------------
+# 7. 动能计算
+# --------------------------------------
+
+speed = np.sqrt(vx**2 + vy**2)
+rot_ke = 0.5 * INERTIA_KG_M2 * (omega**2 + omega_y**2)
+kinetic_energy = 0.5 * MASS_KG * speed**2 + rot_ke
+potential_energy = MASS_KG * GRAVITY_M_S2 * (y_s[0] - y_s)
+total_energy = kinetic_energy + potential_energy
+
+# --------------------------------------
+# 8. 保存
 # --------------------------------------
 
 np.savetxt(
@@ -159,15 +209,21 @@ np.savetxt(
         ax, ay,
         theta_s,
         omega,
-        alpha
+        alpha,
+        phi,
+        omega_y,
+        alpha_y,
+        kinetic_energy,
+        potential_energy,
+        total_energy
     ]),
-    header="t x y vx vy ax ay theta omega alpha"
+    header="t x y vx vy ax ay theta omega alpha phi omega_y alpha_y kinetic_energy potential_energy total_energy"
 )
 
 print("Saved rigidbody_data.txt")
 
 # --------------------------------------
-# 7. 可视化
+# 9. 可视化
 # --------------------------------------
 
 plt.figure()
@@ -183,4 +239,20 @@ plt.show()
 plt.figure()
 plt.plot(time, alpha)
 plt.title("Angular acceleration")
+plt.show()
+
+plt.figure()
+plt.plot(time, kinetic_energy)
+plt.title("Kinetic energy")
+plt.xlabel("Time (s)")
+plt.ylabel("J")
+plt.show()
+
+plt.figure()
+plt.plot(time, total_energy)
+plt.title("Total energy")
+plt.xlabel("Time (s)")
+plt.ylabel("J")
+plt.tight_layout()
+plt.savefig("total_energy.png", dpi=200)
 plt.show()
